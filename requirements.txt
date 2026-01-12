@@ -1,0 +1,5 @@
+fontTools
+pandas
+PIL
+tkinter
+ttkbootstrap

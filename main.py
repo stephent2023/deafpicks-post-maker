@@ -2,10 +2,10 @@ import requests
 import json
 import os
 import pandas
+import webbrowser
 import ttkbootstrap as ttk
 import tkinter as tk
-from tkinter import messagebox, colorchooser
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageTk
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageTk, UnidentifiedImageError
 from ttkbootstrap.constants import *
 from fontTools.merge import Merger
 
@@ -28,6 +28,7 @@ cover_size = 3000
 text_box_border = 50
 regular_font = ('cambria.ttf')
 bold_font = ('C:/Windows/Fonts/cambriab.ttf')
+ssl_enabled = True
 
 
 # main
@@ -50,7 +51,7 @@ class DP_Postmaker(ttk.Frame):
     def create_screen(self):
 
         # title
-        self.title = ttk.Label(text="DP Post Generator 0.9", font=('TkDefaultFixed', 30), justify='left')
+        self.title = ttk.Label(text="DP Post Generator 0.91", font=('TkDefaultFixed', 30), justify='left')
         self.title.pack(side= TOP, pady=0)
 
         # header separator
@@ -93,15 +94,17 @@ class DP_Postmaker(ttk.Frame):
 
         # get cover button
         self.names_button = tk.Button(master=self.top_container, text="Get cover!",padx = 10,bd = 2,command=lambda : self.get_cover_pressed())
-        self.names_button.pack(side=TOP, pady=20)
+        self.names_button.pack(side=TOP, pady=10)
 
-        # logo location and color box
-        self.logo_loc_color_container = tk.Frame(master=self.top_container)
-        self.logo_loc_color_container.pack(side=TOP, pady=10, fill=X)
+        # open cover image
+        self.open_cover_button = tk.Button(master=self.top_container,text="Open cover!",padx = 10,bd = 2,command=lambda : webbrowser.open(self.image_url, new=0, autoraise=True))
+        self.open_cover_button.pack(side=TOP, expand=NO)
+        self.open_cover_button.config(state=tk.DISABLED)
+
 
         # get color button
-        self.get_color_button = tk.Button(master=self.logo_loc_color_container, text="Text colour",padx = 10,bd = 2,command=lambda : self.color_picker())
-        self.get_color_button.pack(pady=0)
+        self.get_color_button = tk.Button(master=self.top_container, text="Text colour",padx = 10,bd = 2,command=lambda : self.color_picker())
+        self.get_color_button.pack(pady=10)
 
         # second seperator
         self.center_separator = ttk.Separator(orient=HORIZONTAL)
@@ -246,74 +249,108 @@ class DP_Postmaker(ttk.Frame):
 
 
     def get_cover_pressed(self):
+        # reset variables we are looking for
+        self.found_artistid = None
+        self.artworkURL = None
+        self.artistLinkURL = None
+
         # get artist name (replace " " with "+") and album name
-        self.artist_name = str(self.artist_name_entry.get())
+        self.artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
         self.album_name = str(self.album_name_entry.get())
 
-        artist_name_with_plus = self.artist_name.replace(" ","+")
+        # send request
+        itunes_response = json.loads((requests.get('https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist', verify=ssl_enabled)).text)
 
-        # don't proceed if artist name or album name box empty
-        if (self.artist_name == "") or (self.album_name == ""):
-
-            # if not, give popup and leave section
-            tk.messagebox.showinfo("Error!",  "Please enter album and artist names!")
-            return()
-
-        # open csv
-        self.open_csv()
-
-        # search for artist
-        itunes_response = json.loads((requests.get('https://itunes.apple.com/search?term=' + artist_name_with_plus + '&entity=musicArtist')).text)
-
-        # error if no artists were found
-        if len(itunes_response['results']) == 0:
-            tk.messagebox.showinfo("Error!","Artist " + self.artist_name + " not found!")
-            return()
-
-        self.found_artistid = ""
-
-        # go through results, matching name input to actual names
+        # compare found names to results, set self.found_artistid to matching one
         for item in itunes_response['results']:
-            if self.artist_name.lower() == (item['artistName']).lower():
-                # if found, get artistid
+            if self.artist_name.lower().replace("+"," ") == (item['artistName']).lower():
                 self.found_artistid = item['artistId']
+                self.artistLinkURL = item['artistLinkUrl']
                 break
 
-        # if not found, error out
-        if self.found_artistid == "":
-            tk.messagebox.showinfo("Error!",  "Artist " + self.artist_name + " not found!")
-            return()
+        # if cant find anything, send error, print found artists and return
+        if self.found_artistid == None:
+            print('\n----------')
+            print('ERROR, artist not found')
+            print('with following link: https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist')
+            if len(itunes_response['results']) > 0:
+                print("Found the following similar artists:")
+                for item in itunes_response['results']:
+                    print(item['artistName'])
+                    print(item['artistLinkUrl'])
+                    print('-')
+            else:
+                print('No similar artists found! Check spelling')
+            return
 
-        # get all albums from artistid found above
-        itunes_response = json.loads((requests.get('https://itunes.apple.com/lookup?id=' + str(self.found_artistid) + '&entity=album')).text)
-        # , verify=False
 
-        # exit if no albums found
-        if len(itunes_response['results']) == 0:
-            tk.messagebox.showinfo("Error!", "Album " + self.album_name + " not found!")
-            return()
+        # try to get list of albums using self.found_artistid
+        itunes_response = json.loads((requests.get('https://itunes.apple.com/lookup?id=' + str(self.found_artistid) + '&entity=album', verify=ssl_enabled)).text)
 
-        self.uncompressed = ""
-
-        # go through albums
+        # loop through all returned items
         for item in itunes_response['results']:
+            # only if its an album
             if 'collectionName' in item:
-                if self.album_name.lower().replace(" ","") in (item['collectionName']).lower().replace(" ",""):
-                    # if album name matching entered name is found, save artist url
-                    artworkURL = item['artworkUrl100']
-                    splitURL = artworkURL.split("/")
-                    self.uncompressed = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(splitURL[5:12])
+                # try to match entered album name to collection name
+                if self.album_name.lower() in (item['collectionName']).lower():
+                    # get artworkURL
+                    self.artworkURL = item['artworkUrl100']
                     break
 
-        if self.uncompressed == "":
-            tk.messagebox.showinfo("Error!",  "Album " + self.album_name + " not found!")
-            return()
+        if self.artworkURL == None:
+            print("\n----------")
+            print('ERROR! Unable to find artwork!')
+            print('with following link: https://itunes.apple.com/lookup?id=' + str(self.found_artistid) + '&entity=album')
+
+            if len(itunes_response['results']) > 0:
+                print('Found the following albums for artist ' + self.artistLinkURL)
+
+                for item in itunes_response['results']:
+                    if 'collectionName' in item:
+                        print(item['collectionName'])
+                        print('-')
+
+            else:
+                print('No albums found for artist ' + self.artistLinkURL)
+
+            return
+
+        # try to getting uncompressed artwork
+        try:
+            splitURL = self.artworkURL.split("/")
+            self.image_url = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(splitURL[5:12])
+            get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw))
+        
+        except UnidentifiedImageError:
+
+            # try getting compressed artwork
+            # older albums sometimes dont have uncompressed
+            try:
+                lowq_image = self.artworkURL.split("/")[0:-1]
+                lowq_image.append("100000x100000-999.jpg")
+                self.image_url = "/".join(lowq_image)
+                get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw)).resize((200, 200))
+
+            except:
+                print("ERROR Unable to get album cover!")
+                if self.image_url == None:
+                    print("For artist " + self.artistLinkURL)
+                    print("Found the following items")
+                            # loop through all returned items
+                    for item in itunes_response['results']:
+                        # only if its an album
+                        if 'collectionName' in item:
+                            print((item['collectionName']))
+                            print("-")
+                else:
+                    print(self.image_url)
+                    print("Covers found: ")
+                    print("Artwork url: " + self.artworkURL)
+
+                return
 
         # save image using Image and resize to 200x200
-        try:
-            self.get_new_image = Image.open(requests.get(self.uncompressed, stream=True).raw)
-        except requests.exceptions.SSLError:
-            self.get_new_image = Image.open(requests.get(self.uncompressed, stream=True, verify=False).raw)
+        self.get_new_image = Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw)
         
 
         # shrink cover for thumbnail
@@ -323,6 +360,10 @@ class DP_Postmaker(ttk.Frame):
         # set picture on page to new image
         self.logo_label.configure(image=new_image_format)
         self.logo_label.image = new_image_format
+
+        # open csv
+        self.open_csv()
+        self.open_cover_button.config(state=tk.NORMAL)
 
 
     def generate_post(self):

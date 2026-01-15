@@ -5,6 +5,7 @@ import pandas
 import webbrowser
 import ttkbootstrap as ttk
 import tkinter as tk
+from tkinter import colorchooser
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageTk, UnidentifiedImageError
 from ttkbootstrap.constants import *
 from fontTools.merge import Merger
@@ -51,7 +52,7 @@ class DP_Postmaker(ttk.Frame):
     def create_screen(self):
 
         # title
-        self.title = ttk.Label(text="DP Post Generator 0.91", font=('TkDefaultFixed', 30), justify='left')
+        self.title = ttk.Label(text="DP Post Generator 0.93", font=('TkDefaultFixed', 30), justify='left')
         self.title.pack(side= TOP, pady=0)
 
         # header separator
@@ -206,7 +207,7 @@ class DP_Postmaker(ttk.Frame):
 
     def color_picker(self):
 
-        color_code = tk.colorchooser.askcolor(title ="Choose color") 
+        color_code = colorchooser.askcolor(title ="Choose color") 
         print(color_code[1])
         hex_code = color_code[1].lstrip('#')
         self.rgb_code = tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))

@@ -1,5 +1,6 @@
 fontTools
 pandas
-PIL
-tkinter
+PILLOW
+requests
+# tkinter
 ttkbootstrap

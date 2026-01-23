@@ -19,7 +19,6 @@ individual_scores_title = 575
 individual_scores_font_size = 220
 individual_scores_border = 130
 individual_scores_title_border = 110
-logo_file = 'apple badge.png'
 font_file = 'fonts/cambriab.ttf'
 regular_font = 'fonts/cambria_with_emojis.ttf'
 review_font_size = 80
@@ -61,9 +60,11 @@ class DP_Postmaker(ttk.Frame):
         self.top_container = ttk.Frame()
         self.top_container.pack(side=TOP, pady=0)
 
-        # image
-        img = Image.open(logo_file)
-        img = img.resize((200, 200))
+        # album image slot - start with placeholder square
+        img = Image.new('RGB', (200, 200), color = 'Gray')
+        draw = ImageDraw.Draw(img)
+        draw.rectangle((1,1,198,198),fill='white')
+
         logo = ImageTk.PhotoImage(img)
         self.logo_label = tk.Label(image=logo, master=self.top_container)
         self.logo_label.image = logo
@@ -565,9 +566,6 @@ class DP_Postmaker(ttk.Frame):
 
             # if enough space for names
             if total_space_required < remaining_height:
-
-                # debug rectangle
-                # draw.rectangle((10,height_offset,(1000),(height_offset+remaining_height-10)),fill='white')
 
                 # calculate how much gap between names
                 names_spacing = (remaining_height - text_space_required - side_border_size) / (len(slide3_reviewers_and_scores))

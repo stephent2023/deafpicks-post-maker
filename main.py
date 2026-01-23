@@ -12,21 +12,9 @@ from fontTools.merge import Merger
 
 # vars
 reviewers = ('James', 'Ewan', 'Sam', 'Joe', 'Ollie', 'Steve', 'Will', 'Bert', 'Fin', 'Serafina', 'Adam')
-
-logo_offset_value = 100
-average_font_size = 650
-individual_scores_title = 575
-individual_scores_font_size = 220
-individual_scores_border = 130
-individual_scores_title_border = 110
-font_file = 'fonts/cambriab.ttf'
+title_font_file = 'fonts/cambriab.ttf'
 regular_font = 'fonts/cambria_with_emojis.ttf'
-review_font_size = 80
-desired_line_length = 70
-max_line_length = 72
-text_box_size = 2600
 cover_size = 3000
-text_box_border = 50
 ssl_enabled = True
 
 
@@ -36,13 +24,14 @@ class DP_Postmaker(ttk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(master, padding=10, **kwargs)
 
+        # init vars
         self.name_holder = ttk.StringVar(value="Select a name to start!")
         self.first_click = True
         self.album_name = ""
         self.artist_name = ""
         self.text_reviews = [""] * len(reviewers)
         self.score_reviews = [""] * len(reviewers)
-        self.rgb_code = (0,0,0)
+        self.rgb_code = (255,255,255)
 
         self.create_screen()
 
@@ -383,7 +372,8 @@ class DP_Postmaker(ttk.Frame):
         score_ints = [int(n) for n in self.score_reviews if n]
         average = int(round(sum(score_ints)/len(score_ints),0))
         # font def
-        font = ImageFont.truetype(font_file, average_font_size)
+        average_font_size = cover_size / 5
+        font = ImageFont.truetype(title_font_file, average_font_size)
         # start draw
         draw = ImageDraw.Draw(slide2)
         # get font text size
@@ -415,7 +405,7 @@ class DP_Postmaker(ttk.Frame):
         while printing_title == True:
 
             # set font
-            font = ImageFont.truetype(font_file, title_size)
+            font = ImageFont.truetype(title_font_file, title_size)
             # get title size
             _, _, title_text_w, title_text_h = draw.textbbox((0,0),self.album_name,font=font)
 
@@ -553,7 +543,7 @@ class DP_Postmaker(ttk.Frame):
         while printing_names == True:
 
             # set font size
-            font = ImageFont.truetype(font_file, reviewers_size)
+            font = ImageFont.truetype(title_font_file, reviewers_size)
 
             # calculate text space required for the amount of people
             text_space_required = (( reviewers_size -  ( reviewers_size / 3.34 ) ) * len(slide3_reviewers_and_scores))
@@ -595,6 +585,11 @@ class DP_Postmaker(ttk.Frame):
     def generate_reviews_slides(self):
 
             reviews_slides = []
+
+            # define dimensions
+            review_font_size = cover_size / 37.5
+            text_box_size = 3000 * (13/15)
+            text_box_border = cover_size / 60
 
             # calculate maximum text area
             max_line_pixels = text_box_size - (2 * text_box_border)

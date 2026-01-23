@@ -20,15 +20,14 @@ individual_scores_font_size = 220
 individual_scores_border = 130
 individual_scores_title_border = 110
 logo_file = 'apple badge.png'
-font_file = 'C:/Windows/Fonts/Cambria/cambriab.ttf'
+font_file = 'fonts/cambriab.ttf'
+regular_font = 'fonts/cambria_with_emojis.ttf'
 review_font_size = 80
 desired_line_length = 70
 max_line_length = 72
 text_box_size = 2600
 cover_size = 3000
 text_box_border = 50
-regular_font = ('cambria.ttf')
-bold_font = ('C:/Windows/Fonts/cambriab.ttf')
 ssl_enabled = True
 
 
@@ -376,7 +375,7 @@ class DP_Postmaker(ttk.Frame):
         self.open_cover_button.config(state=tk.NORMAL)
 
 
-    def generate_slide_2(self):
+    def generate_average_slide(self):
 
         # get average score
         slide2 = self.image_blurred.copy()
@@ -395,7 +394,7 @@ class DP_Postmaker(ttk.Frame):
         return(slide2)
 
 
-    def generate_slide_3(self):
+    def generate_scores_slide(self):
 
         slide3 = self.image_blurred.copy()
         draw = ImageDraw.Draw(slide3)
@@ -559,7 +558,7 @@ class DP_Postmaker(ttk.Frame):
             text_space_required = (( reviewers_size -  ( reviewers_size / 3.34 ) ) * len(slide3_reviewers_and_scores))
 
             # calculate blank space required
-            blank_space_required = ( reviewers_size / 3 ) * ( len(slide3_reviewers_and_scores) + 1 )
+            blank_space_required = (( reviewers_size / 3 ) * ( len(slide3_reviewers_and_scores) )) + side_border_size
 
             # total space required
             total_space_required = text_space_required + blank_space_required
@@ -571,7 +570,7 @@ class DP_Postmaker(ttk.Frame):
                 # draw.rectangle((10,height_offset,(1000),(height_offset+remaining_height-10)),fill='white')
 
                 # calculate how much gap between names
-                names_spacing = (remaining_height - text_space_required) / (len(slide3_reviewers_and_scores) + 1)
+                names_spacing = (remaining_height - text_space_required - side_border_size) / (len(slide3_reviewers_and_scores))
 
                 # loop through slides and print
                 for review in slide3_reviewers_and_scores:
@@ -594,6 +593,268 @@ class DP_Postmaker(ttk.Frame):
 
         # return
         return(slide3)
+
+    def generate_reviews_slides(self):
+
+            reviews_slides = []
+
+            # calculate maximum text area
+            max_line_pixels = text_box_size - (2 * text_box_border)
+            # calculate text starting points
+            text_starting_x = ((cover_size - text_box_size)/2)+text_box_border
+            text_starting_y = ((cover_size - text_box_size)/2)+ text_box_border/2
+            # caculate size of 1 line
+            line_size = round((review_font_size * 1.33),0) - 10
+            # calculate maximum number of lines for textbox and text size
+            max_lines_per_page = ((text_box_size - text_box_border * 2) // line_size)
+
+            # set font
+            font = ImageFont.truetype(regular_font, review_font_size)
+            # make working image
+            working_image = self.image_blurred.copy()
+
+            # calculate and draw full white box
+            white_box_border = (cover_size - text_box_size) / 2
+            draw = ImageDraw.Draw(working_image)
+            draw.rectangle((white_box_border,white_box_border,(cover_size - white_box_border),(cover_size - white_box_border)),fill='white')
+            # get font text size
+
+            # init storage vars
+            reviewer_number = 0 
+            people_who_reviewed = []
+            review_listlist_hyperobject = []
+
+            #loop over all reviewers
+            for reviewer_name in reviewers:
+
+                # only go in if person has review
+                if self.text_reviews[reviewer_number] != "":
+
+                    # collect names of people who reviewed
+                    people_who_reviewed.append(reviewer_name)
+                    # review = name + persons review
+                    person_full_review = (reviewer_name + ' - ' + self.text_reviews[reviewer_number]).replace("\n"," \n ")
+                    # get review as list
+                    person_review_list = person_full_review.split(" ")
+                    # init finalised review list
+                    person_review_formatted = [""]
+                    # reset line counter
+                    line_number = 0
+
+                    # loop through every word in persons review
+                    for word in person_review_list:
+
+                        # current what line looks like before word added
+                        current_line_holder = person_review_formatted[line_number]
+                        # add word
+                        person_review_formatted[line_number] += word
+                        # draw line with new word
+                        _, _, text_w, text_h = draw.textbbox((0,0),person_review_formatted[line_number],font=font)
+
+                        # see if line is too long
+                        if text_w > max_line_pixels:
+
+                            # put line back to what it was if too long
+                            person_review_formatted[line_number] = current_line_holder
+                            # move to next line
+                            line_number += 1
+                            # create space for new line in list
+                            person_review_formatted.append('')
+                            # add word to new line
+                            person_review_formatted[line_number] += word
+
+                        # add a space after word
+                        person_review_formatted[line_number] += ' '
+
+                        # if word is \n or has \n
+                        if '\n' in word:
+                            # move to next line
+                            line_number += 1
+                            # create space for next line in list
+                            person_review_formatted.append("")
+
+                    # once complete, add list to list of lists
+                    review_listlist_hyperobject.append(person_review_formatted)
+
+                # move to next person
+                reviewer_number += 1
+
+            # init page length counter
+            current_page_length = 0
+            # reset reviewer number var
+
+            # initialise variables
+            reviewer_number = 0
+            pages_mega_list_list = []
+            current_page_list = []
+            page_metadata_tracker = []
+            metadata_mega_list_list = []
+
+            # loop through reviewers
+            for reviewer in people_who_reviewed:
+                
+                # extract current review
+                current_review = review_listlist_hyperobject[reviewer_number]
+                # reset current review line counter
+                current_review_line_counter = 0
+                # keep looping through lines of review
+
+                # before adding review to page, if there is less than 1/2 page left start new one
+                if (max_lines_per_page - len(current_page_list)) < (1/2 * max_lines_per_page):
+
+                    pages_mega_list_list.append(current_page_list)
+                    metadata_mega_list_list.append(page_metadata_tracker)
+                    page_metadata_tracker = []
+                    current_page_list = []
+
+                # loop through lines of review
+                for review_line in current_review:
+
+                    # if page is full, start new one
+                    if len(current_page_list) >= max_lines_per_page:
+
+                        pages_mega_list_list.append(current_page_list)
+                        metadata_mega_list_list.append(page_metadata_tracker)
+                        page_metadata_tracker = []
+                        current_page_list = []
+
+                    # add line to page list and add a metadata line for line
+                    current_page_list.append(review_line)
+                    page_metadata_tracker.append('')
+
+                    # add metadata
+
+                    # track starting line for bold name
+                    if current_review_line_counter == 0:
+
+                        page_metadata_tracker[-1] += 'first-line'
+
+                    # track new lines for non-justified
+                    if ('\n' in review_line) or (current_review_line_counter == (len(current_review)-1)):
+
+                        page_metadata_tracker[-1] += 'non-justified'
+
+                    # count up line counter
+                    current_review_line_counter += 1
+
+                # 
+                if len(current_page_list) < max_lines_per_page:
+
+                    current_page_list.append('')
+                    page_metadata_tracker.append('')
+                    page_metadata_tracker[-1] += 'non-justified'
+                
+                # count up reviewer number
+                reviewer_number += 1
+
+            # add final review page to list list
+            pages_mega_list_list.append(current_page_list)
+            metadata_mega_list_list.append(page_metadata_tracker)
+
+
+            # remove empty lines at end of lists
+            for i in range(len(pages_mega_list_list)):
+
+                if pages_mega_list_list[i][-1] == '':
+                    pages_mega_list_list[i].pop(-1)
+                    metadata_mega_list_list[i].pop(-1)
+
+            # set page counter
+            page_counter = 0
+
+            # for each page list
+            for final_page_list in pages_mega_list_list:
+
+                # reset line counter
+                page_line_counter = 0
+
+                # create copy image to work on
+                working_image = self.image_blurred.copy()
+                # load font
+                font = ImageFont.truetype(regular_font, review_font_size)
+
+                # 
+                # if final_page_list[-1] == '':
+                #     final_page_list.pop(-1)
+
+                # draw white box
+                draw = ImageDraw.Draw(working_image)
+                draw.rectangle((white_box_border,white_box_border,(cover_size - white_box_border),(cover_size - white_box_border)),fill='white')
+
+                # reset line offset 
+                text_starting_y = ((cover_size - text_box_size)/2)+ text_box_border/2
+
+                # for each line in page list
+                for line in final_page_list:
+
+                    # set word start offset to 0
+                    word_start_offset = 0
+
+                    # if first line, draw name in bold
+                    if 'first-line' in metadata_mega_list_list[page_counter][page_line_counter]:
+
+                        # get first word of line
+                        current_reviewer_name = (line.split(' '))[0]
+
+                        # load bold font
+                        font = ImageFont.truetype('C:/Windows/Fonts/Cambria/cambriab.ttf', review_font_size)
+                        # draw name
+                        draw.text((text_starting_x,text_starting_y),current_reviewer_name + ' ',(0,0,0),font=font)
+                        # append pixel length of this text to word start x value
+                        _, _, word_width, word_height = draw.textbbox((0,0),current_reviewer_name + ' ',font=font)
+                        word_start_offset += word_width
+
+                        # remove first word from line
+                        line = line.replace(current_reviewer_name + ' ','')
+
+                        # set font back to regular text
+                        font = ImageFont.truetype(regular_font, review_font_size)
+                    
+                    # if line is non justified, draw text normally
+                    if 'non-justified' in metadata_mega_list_list[page_counter][page_line_counter]:
+
+                        draw.text(((text_starting_x + word_start_offset),text_starting_y),line,(0,0,0),font=font)
+
+                    # if not, justify
+                    else:
+
+                        line_word_list = line.split()
+
+                        # calculate size of line without spaces, then calculate how much space needed between each word
+                        _, _, no_spaces_width, no_spaces_height = draw.textbbox((0,0),"".join(line_word_list),font=font)
+
+                        required_space_width = (max_line_pixels - no_spaces_width - word_start_offset) / (len(line_word_list) - 1)
+
+                        # justify text - cycle through each word
+                        for line_word in line_word_list:
+                            # draw word
+                            draw.text(((text_starting_x + word_start_offset),text_starting_y),line_word,(0,0,0),font=font,)
+                            # calculate that words width
+                            _, _, word_width, word_height = draw.textbbox((0,0),line_word,font=font)
+                            # add width to offset
+                            word_start_offset += word_width + required_space_width  
+
+
+                    # after all words add height of font to starting y position
+                    text_starting_y += round((review_font_size * 1.33),0) - 10 
+
+                    # increase line counter
+                    page_line_counter += 1
+
+                # draw blurred box to crop white box
+                #replace_box_height = int(text_starting_y - (round((review_font_size * 1.33),0) - 10 ) + text_box_border)
+                replace_box_height = int(text_starting_y + text_box_border)
+                replace_box = (0,replace_box_height,cover_size,cover_size)
+                replace_image = self.image_blurred.copy()
+                replace_region = replace_image.crop(replace_box)
+                working_image.paste(replace_region,replace_box)                        
+
+                # save slide
+                reviews_slides.append(working_image)
+                page_counter += 1
+
+
+            return(reviews_slides)
 
     def generate_post(self):
 
@@ -630,276 +891,13 @@ class DP_Postmaker(ttk.Frame):
         slides.append(slide1)
 
         ### slide2
-        slides.append(self.generate_slide_2())
+        slides.append(self.generate_average_slide())
 
         ### slide3
-        slides.append(self.generate_slide_3())
+        slides.append(self.generate_scores_slide())
 
         # ### slide 4+
-        # # create emoji font if it doesnt exist
-        if not os.path.isfile('merged_font.ttf'):
-            emoji_font = 'seguiemj.ttf'
-            # Merge the fonts
-            merger = Merger()
-            new_font = merger.merge([regular_font, emoji_font])
-            # Save the merged font
-            new_font.save("merged_font.ttf")
-
-        # calculate maximum text area
-        max_line_pixels = text_box_size - (2 * text_box_border)
-        # calculate text starting points
-        text_starting_x = ((cover_size - text_box_size)/2)+text_box_border
-        text_starting_y = ((cover_size - text_box_size)/2)+ text_box_border/2
-        # caculate size of 1 line
-        line_size = round((review_font_size * 1.33),0) - 10
-        # calculate maximum number of lines for textbox and text size
-        max_lines_per_page = ((text_box_size - text_box_border * 2) // line_size)
-
-        # set font
-        font = ImageFont.truetype('merged_font.ttf', review_font_size)
-        # make working image
-        working_image = self.image_blurred.copy()
-
-        # calculate and draw full white box
-        white_box_border = (cover_size - text_box_size) / 2
-        draw = ImageDraw.Draw(working_image)
-        draw.rectangle((white_box_border,white_box_border,(cover_size - white_box_border),(cover_size - white_box_border)),fill='white')
-        # get font text size
-
-        # init storage vars
-        reviewer_number = 0 
-        people_who_reviewed = []
-        review_listlist_hyperobject = []
-
-        #loop over all reviewers
-        for reviewer_name in reviewers:
-
-            # only go in if person has review
-            if self.text_reviews[reviewer_number] != "":
-
-                # collect names of people who reviewed
-                people_who_reviewed.append(reviewer_name)
-                # review = name + persons review
-                person_full_review = (reviewer_name + ' - ' + self.text_reviews[reviewer_number]).replace("\n"," \n ")
-                # get review as list
-                person_review_list = person_full_review.split(" ")
-                # init finalised review list
-                person_review_formatted = [""]
-                # reset line counter
-                line_number = 0
-
-                # loop through every word in persons review
-                for word in person_review_list:
-
-                    # current what line looks like before word added
-                    current_line_holder = person_review_formatted[line_number]
-                    # add word
-                    person_review_formatted[line_number] += word
-                    # draw line with new word
-                    _, _, text_w, text_h = draw.textbbox((0,0),person_review_formatted[line_number],font=font)
-
-                    # see if line is too long
-                    if text_w > max_line_pixels:
-
-                        # put line back to what it was if too long
-                        person_review_formatted[line_number] = current_line_holder
-                        # move to next line
-                        line_number += 1
-                        # create space for new line in list
-                        person_review_formatted.append('')
-                        # add word to new line
-                        person_review_formatted[line_number] += word
-
-                    # add a space after word
-                    person_review_formatted[line_number] += ' '
-
-                    # if word is \n or has \n
-                    if '\n' in word:
-                        # move to next line
-                        line_number += 1
-                        # create space for next line in list
-                        person_review_formatted.append("")
-
-                # once complete, add list to list of lists
-                review_listlist_hyperobject.append(person_review_formatted)
-
-            # move to next person
-            reviewer_number += 1
-
-        # init page length counter
-        current_page_length = 0
-        # reset reviewer number var
-
-        # initialise variables
-        reviewer_number = 0
-        pages_mega_list_list = []
-        current_page_list = []
-        page_metadata_tracker = []
-        metadata_mega_list_list = []
-
-        # loop through reviewers
-        for reviewer in people_who_reviewed:
-            
-            # extract current review
-            current_review = review_listlist_hyperobject[reviewer_number]
-            # reset current review line counter
-            current_review_line_counter = 0
-            # keep looping through lines of review
-
-            # before adding review to page, if there is less than 1/2 page left start new one
-            if (max_lines_per_page - len(current_page_list)) < (1/2 * max_lines_per_page):
-
-                pages_mega_list_list.append(current_page_list)
-                metadata_mega_list_list.append(page_metadata_tracker)
-                page_metadata_tracker = []
-                current_page_list = []
-
-            # loop through lines of review
-            for review_line in current_review:
-
-                # if page is full, start new one
-                if len(current_page_list) >= max_lines_per_page:
-
-                    pages_mega_list_list.append(current_page_list)
-                    metadata_mega_list_list.append(page_metadata_tracker)
-                    page_metadata_tracker = []
-                    current_page_list = []
-
-                # add line to page list and add a metadata line for line
-                current_page_list.append(review_line)
-                page_metadata_tracker.append('')
-
-                # add metadata
-
-                # track starting line for bold name
-                if current_review_line_counter == 0:
-
-                    page_metadata_tracker[-1] += 'first-line'
-
-                # track new lines for non-justified
-                if ('\n' in review_line) or (current_review_line_counter == (len(current_review)-1)):
-
-                    page_metadata_tracker[-1] += 'non-justified'
-
-                # count up line counter
-                current_review_line_counter += 1
-
-            # 
-            if len(current_page_list) < max_lines_per_page:
-
-                current_page_list.append('')
-                page_metadata_tracker.append('')
-                page_metadata_tracker[-1] += 'non-justified'
-            
-            # count up reviewer number
-            reviewer_number += 1
-
-        # add final review page to list list
-        pages_mega_list_list.append(current_page_list)
-        metadata_mega_list_list.append(page_metadata_tracker)
-
-
-        # remove empty lines at end of lists
-        for i in range(len(pages_mega_list_list)):
-
-            if pages_mega_list_list[i][-1] == '':
-                pages_mega_list_list[i].pop(-1)
-                metadata_mega_list_list[i].pop(-1)
-
-        # set page counter
-        page_counter = 0
-
-        # for each page list
-        for final_page_list in pages_mega_list_list:
-
-            # reset line counter
-            page_line_counter = 0
-
-            # create copy image to work on
-            working_image = self.image_blurred.copy()
-            # load font
-            font = ImageFont.truetype('merged_font.ttf', review_font_size)
-
-            # 
-            # if final_page_list[-1] == '':
-            #     final_page_list.pop(-1)
-
-            # draw white box
-            draw = ImageDraw.Draw(working_image)
-            draw.rectangle((white_box_border,white_box_border,(cover_size - white_box_border),(cover_size - white_box_border)),fill='white')
-
-            # reset line offset 
-            text_starting_y = ((cover_size - text_box_size)/2)+ text_box_border/2
-
-            # for each line in page list
-            for line in final_page_list:
-
-                # set word start offset to 0
-                word_start_offset = 0
-
-                # if first line, draw name in bold
-                if 'first-line' in metadata_mega_list_list[page_counter][page_line_counter]:
-
-                    # get first word of line
-                    current_reviewer_name = (line.split(' '))[0]
-
-                    # load bold font
-                    font = ImageFont.truetype('C:/Windows/Fonts/Cambria/cambriab.ttf', review_font_size)
-                    # draw name
-                    draw.text((text_starting_x,text_starting_y),current_reviewer_name + ' ',(0,0,0),font=font)
-                    # append pixel length of this text to word start x value
-                    _, _, word_width, word_height = draw.textbbox((0,0),current_reviewer_name + ' ',font=font)
-                    word_start_offset += word_width
-
-                    # remove first word from line
-                    line = line.replace(current_reviewer_name + ' ','')
-
-                    # set font back to regular text
-                    font = ImageFont.truetype('merged_font.ttf', review_font_size)
-                
-                # if line is non justified, draw text normally
-                if 'non-justified' in metadata_mega_list_list[page_counter][page_line_counter]:
-
-                    draw.text(((text_starting_x + word_start_offset),text_starting_y),line,(0,0,0),font=font)
-
-                # if not, justify
-                else:
-
-                    line_word_list = line.split()
-
-                    # calculate size of line without spaces, then calculate how much space needed between each word
-                    _, _, no_spaces_width, no_spaces_height = draw.textbbox((0,0),"".join(line_word_list),font=font)
-
-                    required_space_width = (max_line_pixels - no_spaces_width - word_start_offset) / (len(line_word_list) - 1)
-
-                    # justify text - cycle through each word
-                    for line_word in line_word_list:
-                        # draw word
-                        draw.text(((text_starting_x + word_start_offset),text_starting_y),line_word,(0,0,0),font=font,)
-                        # calculate that words width
-                        _, _, word_width, word_height = draw.textbbox((0,0),line_word,font=font)
-                        # add width to offset
-                        word_start_offset += word_width + required_space_width  
-
-
-                # after all words add height of font to starting y position
-                text_starting_y += round((review_font_size * 1.33),0) - 10 
-
-                # increase line counter
-                page_line_counter += 1
-
-            # draw blurred box to crop white box
-            #replace_box_height = int(text_starting_y - (round((review_font_size * 1.33),0) - 10 ) + text_box_border)
-            replace_box_height = int(text_starting_y + text_box_border)
-            replace_box = (0,replace_box_height,cover_size,cover_size)
-            replace_image = self.image_blurred.copy()
-            replace_region = replace_image.crop(replace_box)
-            working_image.paste(replace_region,replace_box)                        
-
-            # save slide
-            slides.append(working_image)
-            page_counter += 1
-
+        slides += self.generate_reviews_slides()
 
         ###  export
         # create folder for slides
@@ -913,12 +911,10 @@ class DP_Postmaker(ttk.Frame):
         # loop over slides, save to folder
         for slide in slides:
             slide.save(folder + '/slide' + str(slide_number) + '.png')
-
             slide_number += 1
 
         # save blurred image
         self.image_blurred.save(folder + '/blurred.png')
-
 
 ################################
 

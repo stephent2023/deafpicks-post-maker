@@ -8,7 +8,6 @@ import tkinter as tk
 from tkinter import colorchooser, messagebox
 from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageTk, UnidentifiedImageError
 from ttkbootstrap.constants import *
-from fontTools.merge import Merger
 
 # vars
 reviewers = ('James', 'Ewan', 'Sam', 'Joe', 'Ollie', 'Steve', 'Will', 'Bert', 'Fin', 'Serafina', 'Adam')

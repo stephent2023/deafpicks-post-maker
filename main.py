@@ -17,7 +17,6 @@ regular_font = 'fonts/cambria_with_emojis.ttf'
 cover_size = 3000
 ssl_enabled = True
 
-
 # main
 class DP_Postmaker(ttk.Frame):
 
@@ -239,9 +238,9 @@ class DP_Postmaker(ttk.Frame):
 
     def get_cover_pressed(self):
         # reset variables we are looking for
-        self.found_artistid = None
-        self.artworkURL = None
-        self.artistLinkURL = None
+        found_artistid = None
+        artwork_url = None
+        artist_url = None
 
         # get artist name (replace " " with "+") and album name
         self.artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
@@ -260,15 +259,15 @@ class DP_Postmaker(ttk.Frame):
         # send request
         itunes_response = json.loads((requests.get('https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist', verify=ssl_enabled)).text)
 
-        # compare found names to results, set self.found_artistid to matching one
+        # compare found names to results, set found_artistid to matching one
         for item in itunes_response['results']:
             if self.artist_name.lower().replace("+"," ") == (item['artistName']).lower():
-                self.found_artistid = item['artistId']
-                self.artistLinkURL = item['artistLinkUrl']
+                found_artistid = item['artistId']
+                artist_url = item['artistLinkUrl']
                 break
 
         # if cant find anything, send error, print found artists and return
-        if self.found_artistid == None:
+        if found_artistid == None:
             print('\n----------')
             print('ERROR, artist not found')
             print('with following link: https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist')
@@ -283,8 +282,8 @@ class DP_Postmaker(ttk.Frame):
             return
 
 
-        # try to get list of albums using self.found_artistid
-        itunes_response = json.loads((requests.get('https://itunes.apple.com/lookup?id=' + str(self.found_artistid) + '&entity=album', verify=ssl_enabled)).text)
+        # try to get list of albums using found_artistid
+        itunes_response = json.loads((requests.get('https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album', verify=ssl_enabled)).text)
 
         # loop through all returned items
         for item in itunes_response['results']:
@@ -293,16 +292,16 @@ class DP_Postmaker(ttk.Frame):
                 # try to match entered album name to collection name
                 if self.album_name.lower() in (item['collectionName']).lower():
                     # get artworkURL
-                    self.artworkURL = item['artworkUrl100']
+                    artwork_url = item['artworkUrl100']
                     break
 
-        if self.artworkURL == None:
+        if artwork_url == None:
             print("\n----------")
             print('ERROR! Unable to find artwork!')
-            print('with following link: https://itunes.apple.com/lookup?id=' + str(self.found_artistid) + '&entity=album')
+            print('with following link: https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album')
 
             if len(itunes_response['results']) > 0:
-                print('Found the following albums for artist ' + self.artistLinkURL)
+                print('Found the following albums for artist ' + artist_url)
 
                 for item in itunes_response['results']:
                     if 'collectionName' in item:
@@ -310,30 +309,30 @@ class DP_Postmaker(ttk.Frame):
                         print('-')
 
             else:
-                print('No albums found for artist ' + self.artistLinkURL)
+                print('No albums found for artist ' + artist_url)
 
             return
 
         # try to getting uncompressed artwork
         try:
-            splitURL = self.artworkURL.split("/")
+            splitURL = artwork_url.split("/")
             self.image_url = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(splitURL[5:12])
-            get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw))
+            self.get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw))
         
         except UnidentifiedImageError:
 
             # try getting compressed artwork
             # older albums sometimes dont have uncompressed
             try:
-                lowq_image = self.artworkURL.split("/")[0:-1]
+                lowq_image = artwork_url.split("/")[0:-1]
                 lowq_image.append("100000x100000-999.jpg")
                 self.image_url = "/".join(lowq_image)
-                get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw)).resize((200, 200))
+                self.get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw)).resize((200, 200))
 
             except:
                 print("ERROR Unable to get album cover!")
                 if self.image_url == None:
-                    print("For artist " + self.artistLinkURL)
+                    print("For artist " + artist_url)
                     print("Found the following items")
                             # loop through all returned items
                     for item in itunes_response['results']:
@@ -344,11 +343,11 @@ class DP_Postmaker(ttk.Frame):
                 else:
                     print(self.image_url)
                     print("Covers found: ")
-                    print("Artwork url: " + self.artworkURL)
+                    print("Artwork url: " + artwork_url)
 
                 return
 
-        # save image using Image and resize to 200x200
+        # save image
         self.get_new_image = Image.open(requests.get(self.image_url, stream=True, verify=ssl_enabled).raw)
         
 
@@ -765,10 +764,6 @@ class DP_Postmaker(ttk.Frame):
                 working_image = self.image_blurred.copy()
                 # load font
                 font = ImageFont.truetype(regular_font, review_font_size)
-
-                # 
-                # if final_page_list[-1] == '':
-                #     final_page_list.pop(-1)
 
                 # draw white box
                 draw = ImageDraw.Draw(working_image)

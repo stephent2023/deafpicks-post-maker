@@ -28,12 +28,16 @@ class DPPostmaker(ttk.Frame):
         # init vars
         self.name_holder = ttk.StringVar(value="Select a name to start!")
         self.first_click = True
-        self.album_name = ""
-        self.artist_name = ""
         self.text_reviews = [""] * len(REVIEWERS)
         self.score_reviews = [""] * len(REVIEWERS)
         self.rgb_code = (255,255,255)
+        self.image_url = ""
+        self.previous_index = ""
+        self.get_new_image = ""
+        self.image_blurred = ""
+        self.clicked_name = ""
 
+        # create the main screen
         self.create_screen()
 
 
@@ -85,17 +89,16 @@ class DPPostmaker(ttk.Frame):
         self.artist_name_entry.pack(side=TOP, padx=5, fill=X, expand=YES)
 
         # get cover button
-        self.names_button = tk.Button(master=self.top_container, text="Get cover!",padx = 10,bd = 2,command=lambda : self.get_cover_pressed())
+        self.names_button = tk.Button(master=self.top_container, text="Get cover!",padx = 10,bd = 2,command=self.get_cover_pressed)
         self.names_button.pack(side=TOP, pady=10)
 
         # open cover image
-        self.open_cover_button = tk.Button(master=self.top_container,text="Open cover!",padx = 10,bd = 2,command=lambda : webbrowser.open(self.image_url, new=0, autoraise=True))
+        self.open_cover_button = tk.Button(master=self.top_container,text="Open cover!",padx = 10,bd = 2,command=self.open_cover_pressed)
         self.open_cover_button.pack(side=TOP, expand=NO)
         self.open_cover_button.config(state=tk.DISABLED)
 
-
         # get color button
-        self.get_color_button = tk.Button(master=self.top_container, text="Text colour",padx = 10,bd = 2,command=lambda : self.color_picker())
+        self.get_color_button = tk.Button(master=self.top_container, text="Text colour",padx = 10,bd = 2,command=self.color_picker)
         self.get_color_button.pack(pady=10)
 
         # second seperator
@@ -108,7 +111,7 @@ class DPPostmaker(ttk.Frame):
         if len(REVIEWERS)%8 == (1 or 2):
             self.max_length = 6
         # loop through all names and create buttons for each
-        for i in range(len(REVIEWERS)):
+        for i, reviewer in enumerate(REVIEWERS):
             # create new line (frame) when on a multiple of max length
             if i % self.max_length == 0:
                 self.names_container = tk.Frame()
@@ -116,10 +119,10 @@ class DPPostmaker(ttk.Frame):
             # create button
             self.names_button = tk.Button(
                 master=self.names_container,
-                text=REVIEWERS[i],
+                text=reviewer,
                 padx = 10,
                 bd = 1,
-                command=lambda x=REVIEWERS[i]: self.name_pressed(x)
+                command=lambda x=reviewer: self.name_pressed(x)
             )
             self.names_button.pack(side=LEFT, padx=5)
 
@@ -139,10 +142,10 @@ class DPPostmaker(ttk.Frame):
         self.score_entry.pack(side=LEFT, padx=5)
 
         # post container container
-        self.generate_button_container = ttk.Frame()
-        self.generate_button_container.pack(side=BOTTOM, pady=5, fill=X)
+        self.gen_button_container = ttk.Frame()
+        self.gen_button_container.pack(side=BOTTOM, pady=5, fill=X)
         # create post button
-        self.generate_button = tk.Button(master=self.generate_button_container,text="Create post!",padx = 10,bd = 2,command=lambda : self.generate_post())
+        self.generate_button = tk.Button(master=self.gen_button_container,text="Create post!",padx = 10,bd = 2,command=self.generate_post)
         self.generate_button.pack(side=RIGHT, padx=20)
 
         # review entry box
@@ -153,35 +156,35 @@ class DPPostmaker(ttk.Frame):
     def save_csv(self):
         """ Saves inputs to a CSV file which can be loade later """
 
-        self.artist_name = (str(self.artist_name_entry.get()))
-        self.album_name = str(self.album_name_entry.get())
+        artist_name = (str(self.artist_name_entry.get()))
+        album_name = str(self.album_name_entry.get())
 
-        if self.album_name != "":
-            if self.artist_name != "":
-                folder = self.album_name + " - " + self.artist_name
+        if album_name != "":
+            if artist_name != "":
+                folder = album_name + " - " + artist_name
                 # create folder for slides
                 if not os.path.exists(folder):
                     os.makedirs(folder)
 
                 # create dataframe for reviews and export to csv
                 reviews_dataframe = pandas.DataFrame(data={"Name": REVIEWERS, "Review": self.text_reviews, "Score": self.score_reviews})
-                reviews_dataframe.to_csv("./" + folder + "/" + self.album_name + " data.csv", sep=',',index=False)
+                reviews_dataframe.to_csv("./" + folder + "/" + album_name + " data.csv", sep=',',index=False)
 
 
     def open_csv(self):
         """ Looks for pre existing CSV file for album and loads it if found """
 
-        self.artist_name = (str(self.artist_name_entry.get()))
-        self.album_name = str(self.album_name_entry.get())
+        artist_name = (str(self.artist_name_entry.get()))
+        album_name = str(self.album_name_entry.get())
 
         # if the user has entered both an album and an artist
-        if self.album_name != "":
-            if self.artist_name != "":
-                folder = self.album_name + " - " + self.artist_name
-                if os.path.exists("./" + folder + "/" + self.album_name + " data.csv"):
+        if album_name != "":
+            if artist_name != "":
+                folder = album_name + " - " + artist_name
+                if os.path.exists("./" + folder + "/" + album_name + " data.csv"):
 
                     # import pre-existing csv back into dataframe
-                    reviews_dataframe = pandas.read_csv("./" + folder + "/" + self.album_name + " data.csv")
+                    reviews_dataframe = pandas.read_csv("./" + folder + "/" + album_name + " data.csv")
                     csv_names = reviews_dataframe['Name'].fillna("").to_list()
                     csv_reviews = reviews_dataframe['Review'].fillna("").to_list()
                     csv_scores = reviews_dataframe['Score'].fillna("").to_list()
@@ -253,25 +256,27 @@ class DPPostmaker(ttk.Frame):
         artist_url = None
 
         # get artist name (replace " " with "+") and album name
-        self.artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
-        self.album_name = str(self.album_name_entry.get())
+        artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
+        album_name = str(self.album_name_entry.get())
 
         # catch album name!
-        if self.album_name == "":
+        if album_name == "":
             messagebox.showinfo("Error!",  "Enter an album name!")
-            return()
+            return
 
         # catch artist name!
-        if self.artist_name == "":
+        if artist_name == "":
             messagebox.showinfo("Error!",  "Enter an artist name!")
-            return()
+            return
 
         # send request
-        itunes_response = json.loads((requests.get('https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist', verify=SSL_ENABLED, timeout=10)).text)
+        request_url = 'https://itunes.apple.com/search?term=' + artist_name + '&entity=musicArtist'
+        itunes_response = json.loads((
+            requests.get(request_url, verify=SSL_ENABLED, timeout=10)).text)
 
         # compare found names to results, set found_artistid to matching one
         for item in itunes_response['results']:
-            if self.artist_name.lower().replace("+"," ") == (item['artistName']).lower():
+            if artist_name.lower().replace("+"," ") == (item['artistName']).lower():
                 found_artistid = item['artistId']
                 artist_url = item['artistLinkUrl']
                 break
@@ -280,7 +285,7 @@ class DPPostmaker(ttk.Frame):
         if found_artistid is None:
             print('\n----------')
             print('ERROR, artist not found')
-            print('with following link: https://itunes.apple.com/search?term=' + self.artist_name + '&entity=musicArtist')
+            print('with following link: https://itunes.apple.com/search?term=' + artist_name + '&entity=musicArtist')
             if len(itunes_response['results']) > 0:
                 print("Found the following similar artists:")
                 for item in itunes_response['results']:
@@ -292,14 +297,15 @@ class DPPostmaker(ttk.Frame):
             return
 
         # try to get list of albums using found_artistid
-        itunes_response = json.loads((requests.get('https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album', verify=SSL_ENABLED)).text)
+        request_url = 'https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album'
+        itunes_response = json.loads((requests.get(request_url, verify=SSL_ENABLED, timeout=10)).text)
 
         # loop through all returned items
         for item in itunes_response['results']:
             # only if its an album
             if 'collectionName' in item:
                 # try to match entered album name to collection name
-                if self.album_name.lower() in (item['collectionName']).lower():
+                if album_name.lower() in (item['collectionName']).lower():
                     # get artworkURL
                     artwork_url = item['artworkUrl100']
                     break
@@ -324,8 +330,8 @@ class DPPostmaker(ttk.Frame):
 
         # try to getting uncompressed artwork
         try:
-            splitURL = artwork_url.split("/")
-            self.image_url = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(splitURL[5:12])
+            split_url = artwork_url.split("/")
+            self.image_url = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(split_url[5:12])
             self.get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw))
 
         except UnidentifiedImageError:
@@ -336,7 +342,8 @@ class DPPostmaker(ttk.Frame):
                 lowq_image = artwork_url.split("/")[0:-1]
                 lowq_image.append("100000x100000-999.jpg")
                 self.image_url = "/".join(lowq_image)
-                self.get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw)).resize((200, 200))
+                self.get_new_image = (Image.open(
+                    requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw)).resize((200, 200))
 
             except:
                 print("ERROR Unable to get album cover!")
@@ -372,6 +379,10 @@ class DPPostmaker(ttk.Frame):
         self.open_csv()
         self.open_cover_button.config(state=tk.NORMAL)
 
+    def open_cover_pressed(self):
+        """ Opens the current album cover in the user's browser """
+
+        webbrowser.open(self.image_url, new=0, autoraise=True)
 
     def generate_average_slide(self):
         """ Generates a slide with blurred album art in the background and average score out of 100 """
@@ -394,7 +405,7 @@ class DPPostmaker(ttk.Frame):
         return slide2
 
 
-    def generate_scores_slide(self):
+    def generate_scores_slide(self, album_name):
         """ Generates a slide with blurred album art in the background and every persons score """
 
         slide3 = self.image_blurred.copy()
@@ -402,7 +413,7 @@ class DPPostmaker(ttk.Frame):
 
         # place album name at top of screen
         # must fit into two lines
-        album_name_list = self.album_name.split()
+        album_name_list = album_name.split()
 
         side_border_size = COVER_SIZE / 21
         top_border_size  = COVER_SIZE / 16
@@ -417,7 +428,7 @@ class DPPostmaker(ttk.Frame):
             # set font
             font = ImageFont.truetype(TITLE_FONT_FILE, title_size)
             # get title size
-            _, _, title_text_w, title_text_h = draw.textbbox((0,0),self.album_name,font=font)
+            _, _, title_text_w, title_text_h = draw.textbbox((0,0),album_name,font=font)
 
 
             # if title is within allowed size
@@ -438,7 +449,7 @@ class DPPostmaker(ttk.Frame):
                         height_offset = top_border_size - (title_size / 3.34)
 
                         # draw title
-                        draw.text((side_border_size,height_offset),self.album_name,self.rgb_code,font=font)
+                        draw.text((side_border_size,height_offset),album_name,self.rgb_code,font=font)
 
                         # escape while loop
                         printing_title = False
@@ -449,7 +460,7 @@ class DPPostmaker(ttk.Frame):
                     height_offset = top_border_size - (title_size / 3.34)
 
                     # draw title
-                    draw.text((side_border_size,height_offset),self.album_name,self.rgb_code,font=font)
+                    draw.text((side_border_size,height_offset),album_name,self.rgb_code,font=font)
 
                     # escape while loop
                     printing_title = False
@@ -532,15 +543,16 @@ class DPPostmaker(ttk.Frame):
                     title_size = title_size * 0.97
 
         # REVIEWERS
-        REVIEWERS_size = COVER_SIZE / 7
+        reviewers_size = COVER_SIZE / 7
         # init storage list
-        slide3_REVIEWERS_and_scores = []
+        slide3_reviewers_and_scores = []
 
         # loop through REVIEWERS
-        for i in range(len(REVIEWERS)):
+        for i, reviewer in enumerate(REVIEWERS):
+        # for i in range(len(REVIEWERS)):
             # if they have a score, add to list
             if self.score_reviews[i] != "":
-                slide3_REVIEWERS_and_scores.append(REVIEWERS[i] + " - " + self.score_reviews[i])
+                slide3_reviewers_and_scores.append(reviewer + " - " + self.score_reviews[i])
 
         # calculate new offset
         height_offset += title_text_h
@@ -553,13 +565,13 @@ class DPPostmaker(ttk.Frame):
         while printing_names is True:
 
             # set font size
-            font = ImageFont.truetype(TITLE_FONT_FILE, REVIEWERS_size)
+            font = ImageFont.truetype(TITLE_FONT_FILE, reviewers_size)
 
             # calculate text space required for the amount of people
-            text_space_required = (( REVIEWERS_size -  ( REVIEWERS_size / 3.34 ) ) * len(slide3_REVIEWERS_and_scores))
+            text_space_required = (( reviewers_size -  ( reviewers_size / 3.34 ) ) * len(slide3_reviewers_and_scores))
 
             # calculate blank space required
-            blank_space_required = (( REVIEWERS_size / 3 ) * ( len(slide3_REVIEWERS_and_scores) )) + side_border_size
+            blank_space_required = (( reviewers_size / 3 ) * ( len(slide3_reviewers_and_scores) )) + side_border_size
 
             # total space required
             total_space_required = text_space_required + blank_space_required
@@ -568,26 +580,26 @@ class DPPostmaker(ttk.Frame):
             if total_space_required < remaining_height:
 
                 # calculate how much gap between names
-                names_spacing = (remaining_height - text_space_required - side_border_size) / (len(slide3_REVIEWERS_and_scores))
+                names_spacing = (remaining_height - text_space_required - side_border_size) / (len(slide3_reviewers_and_scores))
 
                 # loop through slides and print
-                for review in slide3_REVIEWERS_and_scores:
+                for review in slide3_reviewers_and_scores:
 
                     # add spacing
-                    height_offset +=  names_spacing - ( REVIEWERS_size / 3.34 )
+                    height_offset +=  names_spacing - ( reviewers_size / 3.34 )
 
                     # print line at offset
                     draw.text((side_border_size,height_offset),review,self.rgb_code,font=font)
 
                     # add a little more offset
-                    height_offset += REVIEWERS_size
+                    height_offset += reviewers_size
 
                 printing_names = False
 
             # else try smaller size
             else:
 
-                REVIEWERS_size = REVIEWERS_size * 0.97
+                reviewers_size = reviewers_size * 0.97
 
         # return
         return slide3
@@ -619,8 +631,9 @@ class DPPostmaker(ttk.Frame):
 
         # calculate and draw full white box
         white_box_border = (COVER_SIZE - text_box_size) / 2
+        white_box_opposite_border = COVER_SIZE - white_box_border
         draw = ImageDraw.Draw(working_image)
-        draw.rectangle((white_box_border,white_box_border,(COVER_SIZE - white_box_border),(COVER_SIZE - white_box_border)),fill='white')
+        draw.rectangle((white_box_border,white_box_border,white_box_opposite_border,white_box_opposite_border),fill='white')
         # get font text size
 
         # init storage vars
@@ -653,7 +666,7 @@ class DPPostmaker(ttk.Frame):
                     # add word
                     person_review_formatted[line_number] += word
                     # draw line with new word
-                    _, _, text_w, text_h = draw.textbbox((0,0),person_review_formatted[line_number],font=font)
+                    _, _, text_w, _ = draw.textbbox((0,0),person_review_formatted[line_number],font=font)
 
                     # see if line is too long
                     if text_w > max_line_pixels:
@@ -683,10 +696,7 @@ class DPPostmaker(ttk.Frame):
             # move to next person
             reviewer_number += 1
 
-        # init page length counter
-        current_page_length = 0
         # reset reviewer number var
-
         # initialise variables
         reviewer_number = 0
         pages_mega_list_list = []
@@ -695,7 +705,7 @@ class DPPostmaker(ttk.Frame):
         metadata_mega_list_list = []
 
         # loop through REVIEWERS
-        for reviewer in people_who_reviewed:
+        for _ in people_who_reviewed:
 
             # extract current review
             current_review = review_listlist_hyperobject[reviewer_number]
@@ -757,7 +767,8 @@ class DPPostmaker(ttk.Frame):
 
 
         # remove empty lines at end of lists
-        for i in range(len(pages_mega_list_list)):
+        # for i in range(len(pages_mega_list_list)):
+        for i, _ in enumerate(pages_mega_list_list):
 
             if pages_mega_list_list[i][-1] == '':
                 pages_mega_list_list[i].pop(-1)
@@ -801,7 +812,7 @@ class DPPostmaker(ttk.Frame):
                     # draw name
                     draw.text((text_starting_x,text_starting_y),current_reviewer_name + ' ',(0,0,0),font=font)
                     # append pixel length of this text to word start x value
-                    _, _, word_width, word_height = draw.textbbox((0,0),current_reviewer_name + ' ',font=font)
+                    _, _, word_width, _ = draw.textbbox((0,0),current_reviewer_name + ' ',font=font)
                     word_start_offset += word_width
 
                     # remove first word from line
@@ -821,7 +832,7 @@ class DPPostmaker(ttk.Frame):
                     line_word_list = line.split()
 
                     # calculate size of line without spaces, then calculate how much space needed between each word
-                    _, _, no_spaces_width, no_spaces_height = draw.textbbox((0,0),"".join(line_word_list),font=font)
+                    _, _, no_spaces_width, _ = draw.textbbox((0,0),"".join(line_word_list),font=font)
 
                     required_space_width = (max_line_pixels - no_spaces_width - word_start_offset) / (len(line_word_list) - 1)
 
@@ -830,7 +841,7 @@ class DPPostmaker(ttk.Frame):
                         # draw word
                         draw.text(((text_starting_x + word_start_offset),text_starting_y),line_word,(0,0,0),font=font,)
                         # calculate that words width
-                        _, _, word_width, word_height = draw.textbbox((0,0),line_word,font=font)
+                        _, _, word_width, _ = draw.textbbox((0,0),line_word,font=font)
                         # add width to offset
                         word_start_offset += word_width + required_space_width
 
@@ -866,17 +877,17 @@ class DPPostmaker(ttk.Frame):
         self.save_csv()
 
         # get both album and artist names
-        self.artist_name = str(self.artist_name_entry.get())
-        self.album_name = str(self.album_name_entry.get())
+        artist_name = str(self.artist_name_entry.get())
+        album_name = str(self.album_name_entry.get())
 
         # popup and exit if album cover hasn't been selected yet
         try:
             if self.get_new_image == "":
                 messagebox.showinfo("Error!",  "Please get album cover!")
-                return()
+                return
         except AttributeError:
             messagebox.showinfo("Error!",  "Please get album cover!")
-            return()
+            return
 
         # run name_pressed to ensure most recent data is stored
         self.name_pressed(self.clicked_name)
@@ -895,14 +906,14 @@ class DPPostmaker(ttk.Frame):
         slides.append(self.generate_average_slide())
 
         ### slide3
-        slides.append(self.generate_scores_slide())
+        slides.append(self.generate_scores_slide(album_name))
 
         # ### slide 4+
         slides += self.generate_reviews_slides()
 
         ###  export
         # create folder for slides
-        folder = self.album_name + " - " + self.artist_name
+        folder = album_name + " - " + artist_name
         if not os.path.exists(folder):
             os.makedirs(folder)
 

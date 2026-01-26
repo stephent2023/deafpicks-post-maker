@@ -379,10 +379,12 @@ class DPPostmaker(ttk.Frame):
         self.open_csv()
         self.open_cover_button.config(state=tk.NORMAL)
 
+
     def open_cover_pressed(self):
         """ Opens the current album cover in the user's browser """
 
         webbrowser.open(self.image_url, new=0, autoraise=True)
+
 
     def generate_average_slide(self):
         """ Generates a slide with blurred album art in the background and average score out of 100 """
@@ -405,15 +407,15 @@ class DPPostmaker(ttk.Frame):
         return slide2
 
 
-    def generate_scores_slide(self, album_name):
-        """ Generates a slide with blurred album art in the background and every persons score """
+    def print_title(self, slide, title):
+        """ Places title of up to 2 lines on the page """
 
-        slide3 = self.image_blurred.copy()
-        draw = ImageDraw.Draw(slide3)
+        # start draw
+        draw = ImageDraw.Draw(slide)
 
         # place album name at top of screen
         # must fit into two lines
-        album_name_list = album_name.split()
+        title_list = title.split()
 
         side_border_size = COVER_SIZE / 21
         top_border_size  = COVER_SIZE / 16
@@ -421,15 +423,13 @@ class DPPostmaker(ttk.Frame):
         title_max_width = COVER_SIZE - (2 * side_border_size)
         title_max_height = COVER_SIZE / 3
 
-        # title
-        printing_title = True
-        while printing_title is True:
+        # keep looping until title is printed
+        while True:
 
             # set font
             font = ImageFont.truetype(TITLE_FONT_FILE, title_size)
             # get title size
-            _, _, title_text_w, title_text_h = draw.textbbox((0,0),album_name,font=font)
-
+            _, _, title_text_w, title_text_h = draw.textbbox((0,0),title,font=font)
 
             # if title is within allowed size
             if title_text_w <= title_max_width:
@@ -449,10 +449,10 @@ class DPPostmaker(ttk.Frame):
                         height_offset = top_border_size - (title_size / 3.34)
 
                         # draw title
-                        draw.text((side_border_size,height_offset),album_name,self.rgb_code,font=font)
+                        draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
 
                         # escape while loop
-                        printing_title = False
+                        break
 
                 else:
 
@@ -460,16 +460,16 @@ class DPPostmaker(ttk.Frame):
                     height_offset = top_border_size - (title_size / 3.34)
 
                     # draw title
-                    draw.text((side_border_size,height_offset),album_name,self.rgb_code,font=font)
+                    draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
 
                     # escape while loop
-                    printing_title = False
+                    break
 
             # if not
             else:
 
                 # if more than one word title
-                if len(album_name_list) > 1:
+                if len(title_list) > 1:
 
                     # if two lines is shorter than max height
                     if ( title_text_h * 2 ) < title_max_height:
@@ -478,10 +478,11 @@ class DPPostmaker(ttk.Frame):
                         # keep adding words to title first line until it is too big
                         # then add all remaining words to the second line
                         title_line_1 = []
-                        title_line_2 = album_name_list.copy()
+                        title_line_2 = title_list.copy()
 
                         calculating_first_line = True
 
+                        # keep looping until title can be printed
                         while calculating_first_line is True:
 
                             title_line_1.append(title_line_2[0])
@@ -494,6 +495,7 @@ class DPPostmaker(ttk.Frame):
 
                                 # remove newly added word from list
                                 title_line_1.pop(-1)
+
                                 calculating_first_line = False
 
                             else:
@@ -524,7 +526,7 @@ class DPPostmaker(ttk.Frame):
                             draw.text((side_border_size,height_offset)," ".join(title_line_2),self.rgb_code,font=font)
 
                             # end title loop
-                            printing_title = False
+                            break
 
                         # if not, smaller size and loop
                         else:
@@ -542,36 +544,36 @@ class DPPostmaker(ttk.Frame):
 
                     title_size = title_size * 0.97
 
-        # REVIEWERS
-        reviewers_size = COVER_SIZE / 7
-        # init storage list
-        slide3_reviewers_and_scores = []
-
-        # loop through REVIEWERS
-        for i, reviewer in enumerate(REVIEWERS):
-        # for i in range(len(REVIEWERS)):
-            # if they have a score, add to list
-            if self.score_reviews[i] != "":
-                slide3_reviewers_and_scores.append(reviewer + " - " + self.score_reviews[i])
-
         # calculate new offset
         height_offset += title_text_h
 
+        return slide, title_text_h
+
+
+    def print_lines(self, slide, lines_list, height_offset):
+        """ Prints lines from lines_list onto page, starting from the height offset to the bottom """
+
+
         # calculate remaining height
         remaining_height = COVER_SIZE - height_offset
+        border_size = COVER_SIZE / 21
+        text_size = COVER_SIZE / 7
+
+        # start draw
+        draw = ImageDraw.Draw(slide)
 
         printing_names = True
 
         while printing_names is True:
 
             # set font size
-            font = ImageFont.truetype(TITLE_FONT_FILE, reviewers_size)
+            font = ImageFont.truetype(TITLE_FONT_FILE, text_size)
 
             # calculate text space required for the amount of people
-            text_space_required = (( reviewers_size -  ( reviewers_size / 3.34 ) ) * len(slide3_reviewers_and_scores))
+            text_space_required = (( text_size -  ( text_size / 3.34 ) ) * len(lines_list))
 
             # calculate blank space required
-            blank_space_required = (( reviewers_size / 3 ) * ( len(slide3_reviewers_and_scores) )) + side_border_size
+            blank_space_required = (( text_size / 3 ) * ( len(lines_list) )) + border_size
 
             # total space required
             total_space_required = text_space_required + blank_space_required
@@ -580,29 +582,50 @@ class DPPostmaker(ttk.Frame):
             if total_space_required < remaining_height:
 
                 # calculate how much gap between names
-                names_spacing = (remaining_height - text_space_required - side_border_size) / (len(slide3_reviewers_and_scores))
+                names_spacing = (remaining_height - text_space_required - border_size) / (len(lines_list))
 
                 # loop through slides and print
-                for review in slide3_reviewers_and_scores:
+                for review in lines_list:
 
                     # add spacing
-                    height_offset +=  names_spacing - ( reviewers_size / 3.34 )
+                    height_offset +=  names_spacing - ( text_size / 3.34 )
 
                     # print line at offset
-                    draw.text((side_border_size,height_offset),review,self.rgb_code,font=font)
+                    draw.text((border_size,height_offset),review,self.rgb_code,font=font)
 
                     # add a little more offset
-                    height_offset += reviewers_size
+                    height_offset += text_size
 
                 printing_names = False
 
             # else try smaller size
             else:
 
-                reviewers_size = reviewers_size * 0.97
+                text_size = text_size * 0.97
+
+        return slide
+
+
+    def generate_scores_slide(self, album_name):
+        """ Generates a slide with blurred album art in the background and every persons score """
+
+        slide3 = self.image_blurred.copy()
+
+        slide3, height_offset = self.print_title(slide3, album_name)
+
+        # init storage list
+        slide3_reviewers_and_scores = []
+        # loop through REVIEWERS
+        for i, reviewer in enumerate(REVIEWERS):
+            # if they have a score, add to list
+            if self.score_reviews[i] != "":
+                slide3_reviewers_and_scores.append(reviewer + " - " + self.score_reviews[i])
+
+        slide3 = self.print_lines(slide3, slide3_reviewers_and_scores, height_offset)
 
         # return
         return slide3
+
 
     def generate_reviews_slides(self):
         """ Generates several slides with all the input reviews listed out """
@@ -864,8 +887,8 @@ class DPPostmaker(ttk.Frame):
             reviews_slides.append(working_image)
             page_counter += 1
 
-
         return reviews_slides
+
 
     def generate_post(self):
         """ Generates all slides required for the post """

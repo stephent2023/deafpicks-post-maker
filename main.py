@@ -247,29 +247,13 @@ class DPPostmaker(ttk.Frame):
         self.save_csv()
 
 
-    def get_cover_pressed(self):
-        """ Uses the artist name and album name inputs to try and find album art """
+    def get_album_info(self, album_name, artist_name):
+        ''' Take an input of album name and artist name, and return album details '''
 
-        # reset variables we are looking for
         found_artistid = None
-        artwork_url = None
-        artist_url = None
+        album_info = None
 
-        # get artist name (replace " " with "+") and album name
-        artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
-        album_name = str(self.album_name_entry.get())
-
-        # catch album name!
-        if album_name == "":
-            messagebox.showinfo("Error!",  "Enter an album name!")
-            return
-
-        # catch artist name!
-        if artist_name == "":
-            messagebox.showinfo("Error!",  "Enter an artist name!")
-            return
-
-        # send request
+        # send initial request to itunes searching for artist name
         request_url = 'https://itunes.apple.com/search?term=' + artist_name + '&entity=musicArtist'
         itunes_response = json.loads((
             requests.get(request_url, verify=SSL_ENABLED, timeout=10)).text)
@@ -278,7 +262,6 @@ class DPPostmaker(ttk.Frame):
         for item in itunes_response['results']:
             if artist_name.lower().replace("+"," ") == (item['artistName']).lower():
                 found_artistid = item['artistId']
-                artist_url = item['artistLinkUrl']
                 break
 
         # if cant find anything, send error, print found artists and return
@@ -294,9 +277,10 @@ class DPPostmaker(ttk.Frame):
                     print('-')
             else:
                 print('No similar artists found! Check spelling')
-            return
 
-        # try to get list of albums using found_artistid
+            return('')
+
+        # send request getting list of collections for found artist
         request_url = 'https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album'
         itunes_response = json.loads((requests.get(request_url, verify=SSL_ENABLED, timeout=10)).text)
 
@@ -307,16 +291,17 @@ class DPPostmaker(ttk.Frame):
                 # try to match entered album name to collection name
                 if album_name.lower() in (item['collectionName']).lower():
                     # get artworkURL
-                    artwork_url = item['artworkUrl100']
+                    album_info = item
                     break
 
-        if artwork_url is None:
+        # if can't find anything, error out
+        if album_info is None:
             print("\n----------")
             print('ERROR! Unable to find artwork!')
             print('with following link: https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album')
 
             if len(itunes_response['results']) > 0:
-                print('Found the following albums for artist ' + artist_url)
+                print('Found the following albums for artist ' + artist_name)
 
                 for item in itunes_response['results']:
                     if 'collectionName' in item:
@@ -324,54 +309,75 @@ class DPPostmaker(ttk.Frame):
                         print('-')
 
             else:
-                print('No albums found for artist ' + artist_url)
+                print('No albums found for artist ' + artist_name)
 
-            return
+            return('')
 
-        # try to getting uncompressed artwork
+        return(album_info)
+
+
+    def get_uncompressed_cover_image(self, artwork_url):
+        """ Takes itunes artwork url info and returns a PIL image at the highest available quality """
+
+        cover_image = None
+
+        # try to getting uncompressed artwork from a1 server
         try:
             split_url = artwork_url.split("/")
             self.image_url = "https://a1.mzstatic.com/us/r1000/063/"+"/".join(split_url[5:12])
-            self.get_new_image = (Image.open(requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw))
+            cover_image = (Image.open(requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw))
 
         except UnidentifiedImageError:
 
-            # try getting compressed artwork
-            # older albums sometimes dont have uncompressed
+            # try getting compressed artwork - older albums dont have uncompressed
             try:
                 lowq_image = artwork_url.split("/")[0:-1]
                 lowq_image.append("100000x100000-999.jpg")
                 self.image_url = "/".join(lowq_image)
-                self.get_new_image = (Image.open(
+                cover_image = (Image.open(
                     requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw)).resize((200, 200))
 
-            except:
-                print("ERROR Unable to get album cover!")
-                if self.image_url is None:
-                    print("For artist " + artist_url)
-                    print("Found the following items")
-                            # loop through all returned items
-                    for item in itunes_response['results']:
-                        # only if its an album
-                        if 'collectionName' in item:
-                            print((item['collectionName']))
-                            print("-")
-                else:
-                    print(self.image_url)
-                    print("Covers found: ")
-                    print("Artwork url: " + artwork_url)
+            except UnidentifiedImageError:
 
-                return
+                print("No cover found at " + self.image_url)
 
-        # save image
-        self.get_new_image = Image.open(requests.get(self.image_url, stream=True, verify=SSL_ENABLED, timeout=10).raw)
+                return cover_image
 
+        return cover_image
+
+
+    def get_cover_pressed(self):
+        """ Uses the artist name and album name inputs to try and find album art """
+
+        # get artist name (replace " " with "+") and album name
+        artist_name = (str(self.artist_name_entry.get())).replace(" ","+")
+        album_name = str(self.album_name_entry.get())
+
+        # catch album name!
+        if album_name == "":
+            messagebox.showinfo("Error!",  "Enter an album name!")
+            return
+
+        # catch artist name!
+        if artist_name == "":
+            messagebox.showinfo("Error!",  "Enter an artist name!")
+            return
+
+        # get album info
+        album_info = self.get_album_info(album_name, artist_name)
+
+        # if no info found, return
+        if album_info == '':
+            return
+
+        # get uncompressed image
+        self.get_new_image = self.get_uncompressed_cover_image(album_info['artworkUrl100'])
 
         # shrink cover for thumbnail
         thumbnail_image = (self.get_new_image).resize((200,200))
         # open image in Tk variable
         new_image_format = ImageTk.PhotoImage(thumbnail_image)
-        # set picture on page to new image
+        # set picture on page to new image - seem to need both commands
         self.logo_label.configure(image=new_image_format)
         self.logo_label.image = new_image_format
 
@@ -383,6 +389,7 @@ class DPPostmaker(ttk.Frame):
     def open_cover_pressed(self):
         """ Opens the current album cover in the user's browser """
 
+        # putting this in a function removes the need for lambda
         webbrowser.open(self.image_url, new=0, autoraise=True)
 
 
@@ -424,7 +431,8 @@ class DPPostmaker(ttk.Frame):
         title_max_height = COVER_SIZE / 3
 
         # keep looping until title is printed
-        while True:
+        printing_title = True
+        while printing_title is True:
 
             # set font
             font = ImageFont.truetype(TITLE_FONT_FILE, title_size)
@@ -452,7 +460,7 @@ class DPPostmaker(ttk.Frame):
                         draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
 
                         # escape while loop
-                        break
+                        printing_title = False
 
                 else:
 
@@ -463,7 +471,7 @@ class DPPostmaker(ttk.Frame):
                     draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
 
                     # escape while loop
-                    break
+                    printing_title = False
 
             # if not
             else:
@@ -526,7 +534,7 @@ class DPPostmaker(ttk.Frame):
                             draw.text((side_border_size,height_offset)," ".join(title_line_2),self.rgb_code,font=font)
 
                             # end title loop
-                            break
+                            printing_title = False
 
                         # if not, smaller size and loop
                         else:
@@ -552,7 +560,6 @@ class DPPostmaker(ttk.Frame):
 
     def print_lines(self, slide, lines_list, height_offset):
         """ Prints lines from lines_list onto page, starting from the height offset to the bottom """
-
 
         # calculate remaining height
         remaining_height = COVER_SIZE - height_offset
@@ -925,14 +932,21 @@ class DPPostmaker(ttk.Frame):
         # export
         slides.append(slide1)
 
-        ### slide2
-        slides.append(self.generate_average_slide())
+        # only generate slide 2 and 3 if there are score reviews
+        for score in self.score_reviews:
+            if score != '':
+                # slide 2
+                slides.append(self.generate_average_slide())
+                # slide 3
+                slides.append(self.generate_scores_slide(album_name))
+                break
 
-        ### slide3
-        slides.append(self.generate_scores_slide(album_name))
-
-        # ### slide 4+
-        slides += self.generate_reviews_slides()
+        # only generate slide 4 if there are text reviews
+        for review in self.text_reviews:
+            if review != '':
+                print('Found one: ' + review)
+                # ### slide 4+
+                slides += self.generate_reviews_slides()
 
         ###  export
         # create folder for slides

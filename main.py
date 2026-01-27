@@ -27,15 +27,12 @@ class DPPostmaker(ttk.Frame):
 
         # init vars
         self.name_holder = ttk.StringVar(value="Select a name to start!")
-        self.first_click = True
         self.text_reviews = [""] * len(REVIEWERS)
         self.score_reviews = [""] * len(REVIEWERS)
         self.rgb_code = (255,255,255)
         self.image_url = ""
-        self.previous_index = ""
         self.get_new_image = ""
         self.image_blurred = ""
-        self.clicked_name = ""
 
         # create the main screen
         self.create_screen()
@@ -210,38 +207,34 @@ class DPPostmaker(ttk.Frame):
         self.rgb_code = tuple(int(hex_code[i:i+2], 16) for i in (0, 2, 4))
 
 
-    def name_pressed(self, name):
+    def name_pressed(self, name=''):
         """ Saves input review data and loads data of name just clicked """
 
-        # unlock box
-        if self.first_click is True:
+        # if the box was previously clicked
+        if self.name_holder.get() in REVIEWERS:
 
-            self.review_entry['state'] = 'normal'
-
-            # change first click to false for next time
-            self.first_click = False
+            # save previously entered review and score to lists
+            person_index = REVIEWERS.index(self.name_holder.get())
+            self.text_reviews[person_index] = (self.review_entry.get('1.0', 'end')).strip("\n")
+            self.score_reviews[person_index] = self.score_entry.get()
 
         else:
 
-            # store latest click in previous index
-            self.previous_index = REVIEWERS.index(self.clicked_name)
-            # set current contents of review box as contents of previous entry
-            self.text_reviews[self.previous_index] = (self.review_entry.get('1.0', 'end')).strip("\n")
-            self.score_reviews[self.previous_index] = self.score_entry.get()
+            self.review_entry['state'] = 'normal'
 
+        # allow no name to be input
+        if name != '':
+            # set name_holder to selected name
+            self.name_holder.set(name)
 
-        # set name_holder to selected name
-        self.name_holder.set(name)
+            # clear contents of review box
+            self.review_entry.delete('1.0', END)
+            self.score_entry.delete(0, 'end')
 
-        # clear contents of review box
-        self.review_entry.delete('1.0', END)
-        self.score_entry.delete(0, 'end')
-
-        # get latest click, set contents of box to index of that person
-        self.clicked_name = name
-        new_index = REVIEWERS.index(self.clicked_name)
-        self.review_entry.insert('1.0',str(self.text_reviews[new_index]))
-        self.score_entry.insert(0,str(self.score_reviews[new_index]))
+            # insert review and score of newly clicked person into box
+            new_index = REVIEWERS.index(name)
+            self.review_entry.insert('1.0',str(self.text_reviews[new_index]))
+            self.score_entry.insert(0,str(self.score_reviews[new_index]))
 
         # save input to CSV
         self.save_csv()
@@ -278,7 +271,7 @@ class DPPostmaker(ttk.Frame):
             else:
                 print('No similar artists found! Check spelling')
 
-            return('')
+            return ''
 
         # send request getting list of collections for found artist
         request_url = 'https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album'
@@ -311,9 +304,9 @@ class DPPostmaker(ttk.Frame):
             else:
                 print('No albums found for artist ' + artist_name)
 
-            return('')
+            return ''
 
-        return(album_info)
+        return album_info
 
 
     def get_uncompressed_cover_image(self, artwork_url):
@@ -903,8 +896,8 @@ class DPPostmaker(ttk.Frame):
         # init slides list
         slides = []
 
-        # save current data to csv
-        self.save_csv()
+        # run name_pressed to ensure most recent data is stored
+        self.name_pressed()
 
         # get both album and artist names
         artist_name = str(self.artist_name_entry.get())
@@ -919,8 +912,6 @@ class DPPostmaker(ttk.Frame):
             messagebox.showinfo("Error!",  "Please get album cover!")
             return
 
-        # run name_pressed to ensure most recent data is stored
-        self.name_pressed(self.clicked_name)
 
         # resize cover to correct dimensions
         resized_image = self.get_new_image.resize((COVER_SIZE,COVER_SIZE))

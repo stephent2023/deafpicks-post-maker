@@ -469,81 +469,73 @@ class DPPostmaker(ttk.Frame):
             # if not
             else:
 
-                # if more than one word title
-                if len(title_list) > 1:
+                # if more than one word title and two lines is shorter than max height
+                if len(title_list) > 1 and ( title_text_h * 2 ) < title_max_height:
 
-                    # if two lines is shorter than max height
-                    if ( title_text_h * 2 ) < title_max_height:
+                    # figure out where to start new line
+                    # keep adding words to title first line until it is too big
+                    # then add all remaining words to the second line
+                    title_line_1 = []
+                    title_line_2 = title_list.copy()
 
-                        # figure out where to start new line
-                        # keep adding words to title first line until it is too big
-                        # then add all remaining words to the second line
-                        title_line_1 = []
-                        title_line_2 = title_list.copy()
+                    calculating_first_line = True
 
-                        calculating_first_line = True
+                    # keep looping until title can be printed
+                    while calculating_first_line is True:
 
-                        # keep looping until title can be printed
-                        while calculating_first_line is True:
+                        title_line_1.append(title_line_2[0])
 
-                            title_line_1.append(title_line_2[0])
+                        # get width of current first line
+                        _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
 
-                            # get width of current first line
-                            _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
+                        # if width is more than title max_width
+                        if title_text_w > title_max_width:
 
-                            # if width is more than title max_width
-                            if title_text_w > title_max_width:
+                            # remove newly added word from list
+                            title_line_1.pop(-1)
 
-                                # remove newly added word from list
-                                title_line_1.pop(-1)
+                            calculating_first_line = False
 
-                                calculating_first_line = False
-
-                            else:
-
-                                # remove word from line 2
-                                title_line_2.pop(0)
-
-                        # now check length of second line
-                        _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
-
-                        # if second line fits on screen
-                        if title_text_w < title_max_width:
-
-                            # print
-                            _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
-                            height_offset = top_border_size - (title_size / 3.34)
-
-                            # draw first line
-                            draw.text((side_border_size,height_offset)," ".join(title_line_1),self.rgb_code,font=font)
-
-                            # calculate second line offset
-                            height_offset += (title_size * 0.9)
-
-                            # get second line stuff
-                            _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
-
-                            # draw second line
-                            draw.text((side_border_size,height_offset)," ".join(title_line_2),self.rgb_code,font=font)
-
-                            # end title loop
-                            printing_title = False
-
-                        # if not, smaller size and loop
                         else:
 
-                            print('Not gonna work')
-                            title_size = title_size * 0.97
+                            # remove word from line 2
+                            title_line_2.pop(0)
+
+                    # now check length of second line
+                    _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
+
+                    # if second line fits on screen
+                    if title_text_w < title_max_width:
+
+                        # print
+                        _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
+                        height_offset = top_border_size - (title_size / 3.34)
+
+                        # draw first line
+                        draw.text((side_border_size,height_offset)," ".join(title_line_1),self.rgb_code,font=font)
+
+                        # calculate second line offset
+                        height_offset += (title_size * 0.9)
+
+                        # get second line stuff
+                        _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
+
+                        # draw second line
+                        draw.text((side_border_size,height_offset)," ".join(title_line_2),self.rgb_code,font=font)
+
+                        # end title loop
+                        printing_title = False
 
                     # if not, smaller size and loop
                     else:
 
                         title_size = title_size * 0.97
 
-                # if not, try smaller size and loop
+                # if not, smaller size and loop
                 else:
 
                     title_size = title_size * 0.97
+
 
         # calculate new offset
         height_offset += title_text_h

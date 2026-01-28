@@ -241,10 +241,9 @@ class DPPostmaker(ttk.Frame):
 
 
     def get_album_info(self, album_name, artist_name):
-        ''' Take an input of album name and artist name, and return album details '''
+        ''' Take an input of album name and artist name, and returns itunes album details '''
 
         found_artistid = None
-        album_info = None
 
         # send initial request to itunes searching for artist name
         request_url = 'https://itunes.apple.com/search?term=' + artist_name + '&entity=musicArtist'
@@ -270,7 +269,6 @@ class DPPostmaker(ttk.Frame):
                     print('-')
             else:
                 print('No similar artists found! Check spelling')
-
             return ''
 
         # send request getting list of collections for found artist
@@ -279,38 +277,30 @@ class DPPostmaker(ttk.Frame):
 
         # loop through all returned items
         for item in itunes_response['results']:
-            # only if its an album
-            if 'collectionName' in item:
-                # try to match entered album name to collection name
-                if album_name.lower() in (item['collectionName']).lower():
-                    # get artworkURL
-                    album_info = item
-                    break
+            # only if its an album and the album name matches the input one
+            if 'collectionName' in item and album_name.lower() in (item['collectionName']).lower():
+                # get artworkURL
+                return item
 
-        # if can't find anything, error out
-        if album_info is None:
-            print("\n----------")
-            print('ERROR! Unable to find artwork!')
-            print('with following link: https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album')
+        # if can't find anything matching, error out
+        print("\n----------")
+        print('ERROR! Unable to find artwork!')
+        print('with following link: https://itunes.apple.com/lookup?id=' + str(found_artistid) + '&entity=album')
+        # if the response has results, list out possible ones
+        if len(itunes_response['results']) > 0:
+            print('Found the following albums for artist ' + artist_name)
+            for item in itunes_response['results']:
+                if 'collectionName' in item:
+                    print(item['collectionName'])
+                    print('-')
+        else:
+            print('No albums found for artist ' + artist_name)
 
-            if len(itunes_response['results']) > 0:
-                print('Found the following albums for artist ' + artist_name)
-
-                for item in itunes_response['results']:
-                    if 'collectionName' in item:
-                        print(item['collectionName'])
-                        print('-')
-
-            else:
-                print('No albums found for artist ' + artist_name)
-
-            return ''
-
-        return album_info
+        return ''
 
 
     def get_uncompressed_cover_image(self, artwork_url):
-        """ Takes itunes artwork url info and returns a PIL image at the highest available quality """
+        """ Takes itunes artwork url and returns a PIL image at the highest available quality """
 
         cover_image = None
 
@@ -413,15 +403,11 @@ class DPPostmaker(ttk.Frame):
         # start draw
         draw = ImageDraw.Draw(slide)
 
-        # place album name at top of screen
-        # must fit into two lines
         title_list = title.split()
 
         side_border_size = COVER_SIZE / 21
-        top_border_size  = COVER_SIZE / 16
+        text_height_offset  = COVER_SIZE / 16
         title_size = COVER_SIZE / 5
-        title_max_width = COVER_SIZE - (2 * side_border_size)
-        title_max_height = COVER_SIZE / 3
 
         # keep looping until title is printed
         printing_title = True
@@ -432,36 +418,21 @@ class DPPostmaker(ttk.Frame):
             # get title size
             _, _, title_text_w, title_text_h = draw.textbbox((0,0),title,font=font)
 
-            # if title is within allowed size
-            if title_text_w <= title_max_width:
+            # if title is within maximum allowed width
+            if title_text_w <= ( COVER_SIZE - (2 * side_border_size) ):
 
-                # don't let the title be too small...
-                if title_text_w < ( title_max_width / 2 ):
+                # don't let the title be too small... if it is, try going bigger
+                if title_text_w < ( COVER_SIZE / 2 ) - side_border_size and title_text_h < ( COVER_SIZE / 3 ):
 
-                    # as long as the title is shorter than the max height go bigger!
-                    if title_text_h < ( title_max_height ):
-
-                        title_size = title_size * 1.03
-
-                    # if not, print
-                    else:
-
-                        # calculate title offset - text does not start at 0 height
-                        height_offset = top_border_size - (title_size / 3.34)
-
-                        # draw title
-                        draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
-
-                        # escape while loop
-                        printing_title = False
+                    title_size = title_size * 1.03
 
                 else:
 
                     # calculate title offset - text does not start at 0 height
-                    height_offset = top_border_size - (title_size / 3.34)
+                    text_height_offset -= (title_size / 3.34)
 
                     # draw title
-                    draw.text((side_border_size,height_offset),title,self.rgb_code,font=font)
+                    draw.text((side_border_size,text_height_offset),title,self.rgb_code,font=font)
 
                     # escape while loop
                     printing_title = False
@@ -470,7 +441,7 @@ class DPPostmaker(ttk.Frame):
             else:
 
                 # if more than one word title and two lines is shorter than max height
-                if len(title_list) > 1 and ( title_text_h * 2 ) < title_max_height:
+                if len(title_list) > 1 and ( title_text_h * 2 ) < ( COVER_SIZE / 3 ):
 
                     # figure out where to start new line
                     # keep adding words to title first line until it is too big
@@ -489,7 +460,7 @@ class DPPostmaker(ttk.Frame):
                         _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
 
                         # if width is more than title max_width
-                        if title_text_w > title_max_width:
+                        if title_text_w > ( COVER_SIZE - (2 * side_border_size) ):
 
                             # remove newly added word from list
                             title_line_1.pop(-1)
@@ -505,23 +476,23 @@ class DPPostmaker(ttk.Frame):
                     _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
 
                     # if second line fits on screen
-                    if title_text_w < title_max_width:
+                    if title_text_w < ( COVER_SIZE - (2 * side_border_size) ):
 
                         # print
                         _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_1),font=font)
-                        height_offset = top_border_size - (title_size / 3.34)
+                        text_height_offset -= (title_size / 3.34)
 
                         # draw first line
-                        draw.text((side_border_size,height_offset)," ".join(title_line_1),self.rgb_code,font=font)
+                        draw.text((side_border_size,text_height_offset)," ".join(title_line_1),self.rgb_code,font=font)
 
                         # calculate second line offset
-                        height_offset += (title_size * 0.9)
+                        text_height_offset += (title_size * 0.9)
 
                         # get second line stuff
                         _, _, title_text_w, title_text_h = draw.textbbox((0,0)," ".join(title_line_2),font=font)
 
                         # draw second line
-                        draw.text((side_border_size,height_offset)," ".join(title_line_2),self.rgb_code,font=font)
+                        draw.text((side_border_size,text_height_offset)," ".join(title_line_2),self.rgb_code,font=font)
 
                         # end title loop
                         printing_title = False
@@ -538,24 +509,22 @@ class DPPostmaker(ttk.Frame):
 
 
         # calculate new offset
-        height_offset += title_text_h
+        text_height_offset += title_text_h
 
-        return slide, title_text_h
+        return slide, text_height_offset, title_size
 
 
-    def print_lines(self, slide, lines_list, height_offset):
+    def print_lines(self, slide, lines_list, height_offset, text_size):
         """ Prints lines from lines_list onto page, starting from the height offset to the bottom """
 
         # calculate remaining height
         remaining_height = COVER_SIZE - height_offset
         border_size = COVER_SIZE / 21
-        text_size = COVER_SIZE / 7
 
         # start draw
         draw = ImageDraw.Draw(slide)
 
         printing_names = True
-
         while printing_names is True:
 
             # set font size
@@ -603,7 +572,8 @@ class DPPostmaker(ttk.Frame):
 
         slide3 = self.image_blurred.copy()
 
-        slide3, height_offset = self.print_title(slide3, album_name)
+        # print title onto slide
+        slide3, height_offset, title_size = self.print_title(slide3, album_name)
 
         # init storage list
         slide3_reviewers_and_scores = []
@@ -613,7 +583,11 @@ class DPPostmaker(ttk.Frame):
             if self.score_reviews[i] != "":
                 slide3_reviewers_and_scores.append(reviewer + " - " + self.score_reviews[i])
 
-        slide3 = self.print_lines(slide3, slide3_reviewers_and_scores, height_offset)
+        # ensure reviews are always a bit smaller than the title
+        paragraph_starting_size = title_size * 0.8
+
+        # print scores on slide
+        slide3 = self.print_lines(slide3, slide3_reviewers_and_scores, height_offset, paragraph_starting_size)
 
         # return
         return slide3
@@ -927,7 +901,6 @@ class DPPostmaker(ttk.Frame):
         # only generate slide 4 if there are text reviews
         for review in self.text_reviews:
             if review != '':
-                print('Found one: ' + review)
                 # ### slide 4+
                 slides += self.generate_reviews_slides()
 

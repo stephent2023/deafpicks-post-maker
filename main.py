@@ -903,6 +903,7 @@ class DPPostmaker(ttk.Frame):
             if review != '':
                 # ### slide 4+
                 slides += self.generate_reviews_slides()
+                break
 
         ###  export
         # create folder for slides
